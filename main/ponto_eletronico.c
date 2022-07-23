@@ -23,6 +23,9 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "rc522.h"
+#include "Keyboard.h"
+
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
@@ -308,6 +311,17 @@ void configure_rfid()
     rc522_pause();
 }
 
+char *readPassword()
+{
+    return NULL;
+}
+
+char *takePhoto()
+{
+    return NULL;
+}
+
+
 void ponto_eletronico(void *parameter)
 {
     while (1)
@@ -337,16 +351,6 @@ void ponto_eletronico(void *parameter)
         vTaskDelay(3000 / portTICK_PERIOD_MS);
         free(tag);
     }
-}
-
-char *readPassword()
-{
-    return NULL;
-}
-
-char *takePhoto()
-{
-    return NULL;
 }
 
 void app_main(void)
