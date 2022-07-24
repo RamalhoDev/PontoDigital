@@ -23,6 +23,9 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h" // brownout error
+
 #include "rc522.h"
 #include "Keyboard.h"
 
@@ -316,11 +319,47 @@ char *readPassword()
     return NULL;
 }
 
-char *takePhoto()
+
+esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt)
 {
-    return NULL;
+    switch (evt->event_id)
+    {
+    case HTTP_EVENT_ON_DATA:
+        //printf("HTTP_EVENT_ON_DATA: %.*s\n", evt->data_len, (char *)evt->data);
+        printf("HTTP_EVENT_ON_DATA: %d\n", evt->data_len);
+        break;
+
+    default:
+        break;
+    }
+    return ESP_OK;
 }
 
+static void rest_get_take_picture()
+{
+    esp_http_client_config_t config_get = {
+        .url = "http://192.168.0.18/capture",
+        .method = HTTP_METHOD_GET,
+        .cert_pem = NULL,
+        .event_handler = client_event_get_handler};
+        
+    esp_http_client_handle_t client = esp_http_client_init(&config_get);
+    esp_http_client_perform(client);
+    esp_http_client_cleanup(client);
+}
+
+static void rest_get_picture()
+{
+    esp_http_client_config_t config_get = {
+        .url = "http://192.168.0.18/saved-photo",
+        .method = HTTP_METHOD_GET,
+        .cert_pem = NULL,
+        .event_handler = client_event_get_handler};
+        
+    esp_http_client_handle_t client = esp_http_client_init(&config_get);
+    esp_http_client_perform(client);
+    esp_http_client_cleanup(client);
+}
 
 void ponto_eletronico(void *parameter)
 {
@@ -344,7 +383,10 @@ void ponto_eletronico(void *parameter)
         char *password = readPassword();
 
         // tirar foto
-        takePhoto();
+        //vTaskDelay(5000/portTICK_PERIOD_MS);
+        rest_get_take_picture();
+        vTaskDelay(5000/portTICK_PERIOD_MS);
+        rest_get_picture();
 
         // realizar request
         http_rest_with_url(tag, password, inOut);
@@ -355,6 +397,7 @@ void ponto_eletronico(void *parameter)
 
 void app_main(void)
 {
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
