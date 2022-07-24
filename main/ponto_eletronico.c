@@ -23,9 +23,6 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#include "soc/soc.h"
-#include "soc/rtc_cntl_reg.h" // brownout error
-
 #include "rc522.h"
 #include "Keyboard.h"
 
@@ -319,47 +316,11 @@ char *readPassword()
     return NULL;
 }
 
-
-esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt)
+char *takePhoto()
 {
-    switch (evt->event_id)
-    {
-    case HTTP_EVENT_ON_DATA:
-        //printf("HTTP_EVENT_ON_DATA: %.*s\n", evt->data_len, (char *)evt->data);
-        printf("HTTP_EVENT_ON_DATA: %d\n", evt->data_len);
-        break;
-
-    default:
-        break;
-    }
-    return ESP_OK;
+    return NULL;
 }
 
-static void rest_get_take_picture()
-{
-    esp_http_client_config_t config_get = {
-        .url = "http://192.168.0.18/capture",
-        .method = HTTP_METHOD_GET,
-        .cert_pem = NULL,
-        .event_handler = client_event_get_handler};
-        
-    esp_http_client_handle_t client = esp_http_client_init(&config_get);
-    esp_http_client_perform(client);
-    esp_http_client_cleanup(client);
-}
-
-static void rest_get_picture()
-{
-    esp_http_client_config_t config_get = {
-        .url = "http://192.168.0.18/saved-photo",
-        .method = HTTP_METHOD_GET,
-        .cert_pem = NULL,
-        .event_handler = client_event_get_handler};
-        
-    esp_http_client_handle_t client = esp_http_client_init(&config_get);
-    esp_http_client_perform(client);
-    esp_http_client_cleanup(client);
-}
 
 void ponto_eletronico(void *parameter)
 {
@@ -370,6 +331,7 @@ void ponto_eletronico(void *parameter)
             inOut = 1;
         else if (0)
             inOut = 0;
+
         // ler tag do rfid
         rc522_start2();
         while (tag == NULL)
@@ -380,13 +342,11 @@ void ponto_eletronico(void *parameter)
         rc522_pause();
 
         // ler senha
-        char *password = readPassword();
+				vTaskResume(task_printpassword_handle);
+        char *password = passwd;
 
         // tirar foto
-        //vTaskDelay(5000/portTICK_PERIOD_MS);
-        rest_get_take_picture();
-        vTaskDelay(5000/portTICK_PERIOD_MS);
-        rest_get_picture();
+        takePhoto();
 
         // realizar request
         http_rest_with_url(tag, password, inOut);
@@ -397,7 +357,6 @@ void ponto_eletronico(void *parameter)
 
 void app_main(void)
 {
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -411,4 +370,33 @@ void app_main(void)
     wifi_init_sta();
     configure_rfid();
     xTaskCreate(ponto_eletronico, "ponto eletronico", 8192, NULL, 1, NULL);
+
+		/***************************** Keyboard initialization ********************************/
+
+		memset(passwd, 0, PASSWD_SIZE);
+
+		gpio_config_t io_conf;
+
+		// Linhas 
+		io_conf.intr_type = GPIO_INTR_DISABLE;
+		io_conf.mode = GPIO_MODE_OUTPUT;
+		io_conf.pin_bit_mask = (1ULL << 12) | (1ULL << 14) | (1ULL << 27) | (1ULL << 26);
+		io_conf.pull_down_en = 0;
+		io_conf.pull_up_en = 0;
+
+		gpio_config(&io_conf);
+
+		// Colunas 
+		io_conf.intr_type = GPIO_INTR_DISABLE;
+		io_conf.mode = GPIO_MODE_INPUT;
+		io_conf.pin_bit_mask = (1ULL << 25) | (1ULL << 33) | (1ULL << 32) | (1ULL << 35);
+		io_conf.pull_down_en = 1;
+		io_conf.pull_up_en = 0;
+
+		gpio_config(&io_conf);
+
+		character_queue = xQueueCreate(PASSWD_SIZE, sizeof(char));
+
+    xTaskCreate(taskReadKeyboardMatrix, "Ler teclado", 2048, NULL, 1, NULL);
+    xTaskCreate(taskPrintPassword, "Enviar senha", 2048, NULL, 1, NULL);
 }

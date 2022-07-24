@@ -22,7 +22,6 @@
 char passwd[PASSWD_SIZE];
 int passwd_idx = 0;
 
-static QueueHandle_t idx_queue = NULL;
 static QueueHandle_t character_queue = NULL;
 
 static TaskHandle_t task_readkeyboard_handle = NULL;
@@ -51,10 +50,12 @@ void taskPrintPassword(void *args)
 				printf("Senha: %s\n", passwd);
 				passwd_idx = 0;
 				memset(passwd, 0, PASSWD_SIZE);
+				vTaskSuspend(NULL);
 			}
 			else if (received == '0')
 			{
 				passwd_idx = 0;
+				memset(passwd, 0, PASSWD_SIZE);
 			}
 			else
 			{
