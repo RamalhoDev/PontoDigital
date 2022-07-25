@@ -65,8 +65,8 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 
-#define MAX_HTTP_RECV_BUFFER 512
-#define MAX_HTTP_OUTPUT_BUFFER 2048
+#define MAX_HTTP_RECV_BUFFER 3000
+#define MAX_HTTP_OUTPUT_BUFFER 3000
 
 static const char *TAG = "wifi station";
 
@@ -257,6 +257,7 @@ void wifi_init_sta(void)
 
 static void http_rest_with_url(char *tagKey, char *password, int inOut)
 {
+		printf("%s\n", tagKey);
     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
     char *path;
     if (inOut)
@@ -300,6 +301,7 @@ void tag_handler(uint8_t *sn)
 { // serial number is always 5 bytes long
     tag = (char *)malloc(sizeof(char) * 90);
     snprintf(tag, 89, "%#x%#x%#x%#x%#x", sn[0], sn[1], sn[2], sn[3], sn[4]);
+    // printf(tag, 89, "%#x%#x%#x%#x%#x", sn[0], sn[1], sn[2], sn[3], sn[4]);
 }
 
 void configure_rfid()
@@ -337,7 +339,7 @@ esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt)
 static void rest_get_take_picture()
 {
     esp_http_client_config_t config_get = {
-        .url = "http://192.168.0.18/capture",
+        .url = "http://192.168.3.59/capture",
         .method = HTTP_METHOD_GET,
         .cert_pem = NULL,
         .event_handler = client_event_get_handler};
@@ -350,10 +352,25 @@ static void rest_get_take_picture()
 static void rest_get_picture()
 {
     esp_http_client_config_t config_get = {
-        .url = "http://192.168.0.18/saved-photo",
+        .url = "http://192.168.3.59/saved-photo",
         .method = HTTP_METHOD_GET,
         .cert_pem = NULL,
-        .event_handler = client_event_get_handler};
+        .event_handler = client_event_get_handler,
+				.buffer_size = 3000};
+
+    esp_http_client_handle_t client = esp_http_client_init(&config_get);
+    esp_http_client_perform(client);
+    esp_http_client_cleanup(client);
+}
+
+static void rest_post_storage()
+{
+    esp_http_client_config_t config_get = {
+        .url = "http://192.168.3.59/saved-photo",
+        .method = HTTP_METHOD_GET,
+        .cert_pem = NULL,
+        .event_handler = client_event_get_handler,
+				.buffer_size = 3000};
 
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
     esp_http_client_perform(client);
@@ -375,22 +392,23 @@ void ponto_eletronico(void *parameter)
         read_password = 1;
         // ler senha
         // vTaskResume(task_printpassword_handle);
-        while (!read_password)
+        while (read_password)
         {
             ESP_LOGI(TAG, "Reading password");
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
-        char *password = passwd;
+        char *password = passwd + 1;
+				inOut = (password[0] == '8');
         // tirar foto
-        // vTaskDelay(5000/portTICK_PERIOD_MS);
-        // rest_get_take_picture();
-        // vTaskDelay(5000/portTICK_PERIOD_MS);
-        // rest_get_picture();
+        vTaskDelay(5000/portTICK_PERIOD_MS);
+        rest_get_take_picture();
+        vTaskDelay(5000/portTICK_PERIOD_MS);
+        rest_get_picture();
 
         // realizar request
         http_rest_with_url(tag, password, 1);
         vTaskDelay(3000 / portTICK_PERIOD_MS);
-        // free(tag);
+        free(tag);
         tag = NULL;
     }
 }

@@ -17,7 +17,7 @@
 #include "driver/gpio.h"
 #include <string.h>
 
-#define PASSWD_SIZE 4
+#define PASSWD_SIZE 16
 
 char passwd[PASSWD_SIZE];
 int passwd_idx = 0;
@@ -59,7 +59,7 @@ void taskPrintPassword(void *args)
 			}
 			else
 			{
-				// printf("%c\n", received);
+				printf("Character: %c, Idx: %d\n", received, passwd_idx);
 				passwd[passwd_idx] = received;
 				passwd_idx++;
 				// printf();
@@ -72,7 +72,12 @@ void taskReadKeyboardMatrix(void *args)
 {
 	while(1) 
 	{
-		if(!read_password) continue;
+		if(!read_password) 
+		{
+			vTaskDelay(100 / portTICK_PERIOD_MS);
+			continue;
+		}
+
 		for (int i = 0; i < 4; i++)
 		{
 			gpio_set_level(row_pins[0], 0);
