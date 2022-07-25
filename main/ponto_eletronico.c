@@ -34,8 +34,8 @@
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
 */
-#define EXAMPLE_ESP_WIFI_SSID "2G_LUISCOB"
-#define EXAMPLE_ESP_WIFI_PASS "134803sp"
+#define EXAMPLE_ESP_WIFI_SSID "q3"
+#define EXAMPLE_ESP_WIFI_PASS "kdfazaipo"
 #define EXAMPLE_ESP_MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_RETRY
 
 #if CONFIG_ESP_WIFI_AUTH_OPEN
@@ -265,13 +265,10 @@ static void http_rest_with_url(char *tagKey, char *password, int inOut)
         path = "/prod/ponto-out";
 
     esp_http_client_config_t config = {
-        .host = "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com",
-        .path = path,
+        .url = "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com/prod/ponto-in",
         .event_handler = _http_event_handler,
         .user_data = local_response_buffer, // Pass address of local buffer to get response
-        .disable_auto_redirect = true,
-        .method = HTTP_METHOD_POST};
-
+        .method = HTTP_METHOD_POST,};
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_http_client_set_url(client, "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com/prod/ponto-in");
@@ -322,13 +319,12 @@ char *readPassword()
     return NULL;
 }
 
-
 esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt)
 {
     switch (evt->event_id)
     {
     case HTTP_EVENT_ON_DATA:
-        //printf("HTTP_EVENT_ON_DATA: %.*s\n", evt->data_len, (char *)evt->data);
+        // printf("HTTP_EVENT_ON_DATA: %.*s\n", evt->data_len, (char *)evt->data);
         printf("HTTP_EVENT_ON_DATA: %d\n", evt->data_len);
         break;
 
@@ -345,7 +341,7 @@ static void rest_get_take_picture()
         .method = HTTP_METHOD_GET,
         .cert_pem = NULL,
         .event_handler = client_event_get_handler};
-        
+
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
     esp_http_client_perform(client);
     esp_http_client_cleanup(client);
@@ -358,12 +354,11 @@ static void rest_get_picture()
         .method = HTTP_METHOD_GET,
         .cert_pem = NULL,
         .event_handler = client_event_get_handler};
-        
+
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
     esp_http_client_perform(client);
     esp_http_client_cleanup(client);
 }
-
 
 void ponto_eletronico(void *parameter)
 {
@@ -379,29 +374,30 @@ void ponto_eletronico(void *parameter)
         rc522_pause();
         read_password = 1;
         // ler senha
-				//vTaskResume(task_printpassword_handle);
-        while(!read_password){
+        // vTaskResume(task_printpassword_handle);
+        while (!read_password)
+        {
             ESP_LOGI(TAG, "Reading password");
-            vTaskDelay(100/portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
         char *password = passwd;
         // tirar foto
-        //vTaskDelay(5000/portTICK_PERIOD_MS);
-        //rest_get_take_picture();
-        //vTaskDelay(5000/portTICK_PERIOD_MS);
-        //rest_get_picture();
+        // vTaskDelay(5000/portTICK_PERIOD_MS);
+        // rest_get_take_picture();
+        // vTaskDelay(5000/portTICK_PERIOD_MS);
+        // rest_get_picture();
 
         // realizar request
-        http_rest_with_url(tag, password, inOut);
+        http_rest_with_url(tag, password, 1);
         vTaskDelay(3000 / portTICK_PERIOD_MS);
-        //free(tag);
+        // free(tag);
         tag = NULL;
     }
 }
 
 void app_main(void)
 {
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // disable brownout
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -416,31 +412,31 @@ void app_main(void)
     configure_rfid();
     xTaskCreate(ponto_eletronico, "ponto eletronico", 8192, NULL, 6, NULL);
 
-		/***************************** Keyboard initialization ********************************/
+    /***************************** Keyboard initialization ********************************/
 
-		memset(passwd, 0, PASSWD_SIZE);
+    memset(passwd, 0, PASSWD_SIZE);
 
-		gpio_config_t io_conf;
+    gpio_config_t io_conf;
 
-		// Linhas 
-		io_conf.intr_type = GPIO_INTR_DISABLE;
-		io_conf.mode = GPIO_MODE_OUTPUT;
-		io_conf.pin_bit_mask = (1ULL << 12) | (1ULL << 14) | (1ULL << 27) | (1ULL << 26);
-		io_conf.pull_down_en = 0;
-		io_conf.pull_up_en = 0;
+    // Linhas
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1ULL << 12) | (1ULL << 14) | (1ULL << 27) | (1ULL << 26);
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 0;
 
-		gpio_config(&io_conf);
+    gpio_config(&io_conf);
 
-		// Colunas 
-		io_conf.intr_type = GPIO_INTR_DISABLE;
-		io_conf.mode = GPIO_MODE_INPUT;
-		io_conf.pin_bit_mask = (1ULL << 25) | (1ULL << 33) | (1ULL << 32) | (1ULL << 35);
-		io_conf.pull_down_en = 1;
-		io_conf.pull_up_en = 0;
+    // Colunas
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = (1ULL << 25) | (1ULL << 33) | (1ULL << 32) | (1ULL << 35);
+    io_conf.pull_down_en = 1;
+    io_conf.pull_up_en = 0;
 
-		gpio_config(&io_conf);
+    gpio_config(&io_conf);
 
-		character_queue = xQueueCreate(PASSWD_SIZE, sizeof(char));
+    character_queue = xQueueCreate(PASSWD_SIZE, sizeof(char));
 
     xTaskCreate(taskReadKeyboardMatrix, "Ler teclado", 2048, NULL, 1, NULL);
     xTaskCreate(taskPrintPassword, "Enviar senha", 2048, NULL, 1, NULL);
