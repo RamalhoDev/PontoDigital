@@ -28,6 +28,7 @@
 
 #include "rc522.h"
 #include "Keyboard.h"
+#include "base64.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -260,23 +261,30 @@ static void http_rest_with_url(char *tagKey, char *password, int inOut)
 		printf("%s\n", tagKey);
     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
     char *path;
-    if (inOut)
+    // if (inOut)
+    if (1)
         path = "/prod/ponto-in";
     else
         path = "/prod/ponto-out";
 
+		char *url_torado = "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com";
+		char url[300];
+		snprintf(url, 299, "%s%s", url_torado, path);
+
     esp_http_client_config_t config = {
-        .url = "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com/prod/ponto-in",
+        .url = url,
         .event_handler = _http_event_handler,
         .user_data = local_response_buffer, // Pass address of local buffer to get response
         .method = HTTP_METHOD_POST,};
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_url(client, "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com/prod/ponto-in");
+    // esp_http_client_set_url(client, "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com/prod/ponto-in");
 
     // POST
     const char post_data[1024];
-    snprintf(post_data, 1023, "{\"photo_url\":\"www.google.com\",\"password\":\"%s\"}", password);
+    snprintf(post_data, 1023, "{\"photo_url\":\"www.google.com%d\",\"password\":\"%s\"}", rand(), passwd);
+		printf("Potencia: %s\n", password);
+		printf("Potencia: %s\n", post_data);
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
 
@@ -328,6 +336,10 @@ esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt)
     case HTTP_EVENT_ON_DATA:
         // printf("HTTP_EVENT_ON_DATA: %.*s\n", evt->data_len, (char *)evt->data);
         printf("HTTP_EVENT_ON_DATA: %d\n", evt->data_len);
+				// for (int i = 0; i < evt->data_len; i++)
+				// {
+				// 	printf("%d\n", *((char *) evt->data) + i);
+				// }
         break;
 
     default:
@@ -397,8 +409,9 @@ void ponto_eletronico(void *parameter)
             ESP_LOGI(TAG, "Reading password");
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
-        char *password = passwd + 1;
-				inOut = (password[0] == '8');
+        // char *password = passwd + 1;
+				// inOut = (password[0] == '8');
+        char *password = passwd;
         // tirar foto
         vTaskDelay(5000/portTICK_PERIOD_MS);
         rest_get_take_picture();
@@ -407,6 +420,8 @@ void ponto_eletronico(void *parameter)
 
         // realizar request
         http_rest_with_url(tag, password, 1);
+				passwd_idx = 0;
+				memset(passwd, 0, PASSWD_SIZE);
         vTaskDelay(3000 / portTICK_PERIOD_MS);
         free(tag);
         tag = NULL;

@@ -48,8 +48,8 @@ void taskPrintPassword(void *args)
 			if (received == '#')
 			{
 				printf("Senha: %s\n", passwd);
-				passwd_idx = 0;
-				memset(passwd, 0, PASSWD_SIZE);
+				// passwd_idx = 0;
+				// memset(passwd, 0, PASSWD_SIZE);
 				read_password = 0;
 			}
 			else if (received == '0')
