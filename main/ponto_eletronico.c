@@ -23,6 +23,9 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h" // brownout error
+
 #include "rc522.h"
 #include "Keyboard.h"
 
@@ -31,8 +34,8 @@
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
 */
-#define EXAMPLE_ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
-#define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
+#define EXAMPLE_ESP_WIFI_SSID "2G_LUISCOB"
+#define EXAMPLE_ESP_WIFI_PASS "134803sp"
 #define EXAMPLE_ESP_MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_RETRY
 
 #if CONFIG_ESP_WIFI_AUTH_OPEN
@@ -268,7 +271,10 @@ static void http_rest_with_url(char *tagKey, char *password, int inOut)
         .user_data = local_response_buffer, // Pass address of local buffer to get response
         .disable_auto_redirect = true,
         .method = HTTP_METHOD_POST};
+
+
     esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_url(client, "https://ewi7yg0qbc.execute-api.us-east-1.amazonaws.com/prod/ponto-in");
 
     // POST
     const char post_data[1024];
@@ -302,10 +308,10 @@ void tag_handler(uint8_t *sn)
 void configure_rfid()
 {
     const rc522_start_args_t start_args = {
-        .miso_io = 34,
-        .mosi_io = 23,
-        .sck_io = 19,
-        .sda_io = 22,
+        .miso_io = 17,
+        .mosi_io = 5,
+        .sck_io = 18,
+        .sda_io = 19,
         .callback = &tag_handler};
     rc522_start(start_args);
     rc522_pause();
@@ -316,9 +322,46 @@ char *readPassword()
     return NULL;
 }
 
-char *takePhoto()
+
+esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt)
 {
-    return NULL;
+    switch (evt->event_id)
+    {
+    case HTTP_EVENT_ON_DATA:
+        //printf("HTTP_EVENT_ON_DATA: %.*s\n", evt->data_len, (char *)evt->data);
+        printf("HTTP_EVENT_ON_DATA: %d\n", evt->data_len);
+        break;
+
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+static void rest_get_take_picture()
+{
+    esp_http_client_config_t config_get = {
+        .url = "http://192.168.0.18/capture",
+        .method = HTTP_METHOD_GET,
+        .cert_pem = NULL,
+        .event_handler = client_event_get_handler};
+        
+    esp_http_client_handle_t client = esp_http_client_init(&config_get);
+    esp_http_client_perform(client);
+    esp_http_client_cleanup(client);
+}
+
+static void rest_get_picture()
+{
+    esp_http_client_config_t config_get = {
+        .url = "http://192.168.0.18/saved-photo",
+        .method = HTTP_METHOD_GET,
+        .cert_pem = NULL,
+        .event_handler = client_event_get_handler};
+        
+    esp_http_client_handle_t client = esp_http_client_init(&config_get);
+    esp_http_client_perform(client);
+    esp_http_client_cleanup(client);
 }
 
 
@@ -326,12 +369,6 @@ void ponto_eletronico(void *parameter)
 {
     while (1)
     {
-        // ler primeiro digito -> define se é in ou out
-        if (1)
-            inOut = 1;
-        else if (0)
-            inOut = 0;
-
         // ler tag do rfid
         rc522_start2();
         while (tag == NULL)
@@ -340,23 +377,31 @@ void ponto_eletronico(void *parameter)
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
         rc522_pause();
-
+        read_password = 1;
         // ler senha
-				vTaskResume(task_printpassword_handle);
+				//vTaskResume(task_printpassword_handle);
+        while(!read_password){
+            ESP_LOGI(TAG, "Reading password");
+            vTaskDelay(100/portTICK_PERIOD_MS);
+        }
         char *password = passwd;
-
         // tirar foto
-        takePhoto();
+        //vTaskDelay(5000/portTICK_PERIOD_MS);
+        //rest_get_take_picture();
+        //vTaskDelay(5000/portTICK_PERIOD_MS);
+        //rest_get_picture();
 
         // realizar request
         http_rest_with_url(tag, password, inOut);
         vTaskDelay(3000 / portTICK_PERIOD_MS);
-        free(tag);
+        //free(tag);
+        tag = NULL;
     }
 }
 
 void app_main(void)
 {
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -369,7 +414,7 @@ void app_main(void)
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
     configure_rfid();
-    xTaskCreate(ponto_eletronico, "ponto eletronico", 8192, NULL, 1, NULL);
+    xTaskCreate(ponto_eletronico, "ponto eletronico", 8192, NULL, 6, NULL);
 
 		/***************************** Keyboard initialization ********************************/
 

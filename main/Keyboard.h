@@ -21,7 +21,7 @@
 
 char passwd[PASSWD_SIZE];
 int passwd_idx = 0;
-
+int read_password = 0;
 static QueueHandle_t character_queue = NULL;
 
 static TaskHandle_t task_readkeyboard_handle = NULL;
@@ -50,7 +50,7 @@ void taskPrintPassword(void *args)
 				printf("Senha: %s\n", passwd);
 				passwd_idx = 0;
 				memset(passwd, 0, PASSWD_SIZE);
-				vTaskSuspend(NULL);
+				read_password = 0;
 			}
 			else if (received == '0')
 			{
@@ -72,6 +72,7 @@ void taskReadKeyboardMatrix(void *args)
 {
 	while(1) 
 	{
+		if(!read_password) continue;
 		for (int i = 0; i < 4; i++)
 		{
 			gpio_set_level(row_pins[0], 0);
